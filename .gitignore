@@ -78,12 +78,17 @@ R-package/inst/*
 *.rec
 *.lst
 *.zip
-*ubyte
+:w*ubyte
 *.bin
 
 # ipython notebook
 example/notebooks/.ipynb_checkpoints/*
 *_pb2.py
+
+# data
+examples/cs231n/assignment3/.env/*
+examples/cs231n/assignment3/cs231n/datasets/
+
 
 # Jetbrain
 .idea
