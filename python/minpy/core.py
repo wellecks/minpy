@@ -8,6 +8,8 @@ from .utils import log
 from . import array
 
 from .array_variants import ArrayType
+from .array_variants import array_types
+from .array_variants import number_types
 
 _logger = log.get_logger(__name__)
 
@@ -39,15 +41,15 @@ def grad_and_loss(func, argnum=0):
         arrays = tuple(map(make_array, args))
         argnums = [argnum] if type(argnum) is int else argnum
         for i in argnums:
-          arrays[i]._marked_for_bp = True
+            arrays[i]._marked_for_bp = True
         result_array = func(*arrays)
         _logger.debug('---Forward pass finished. Start backward pass')
         grad_vals = []
         for i in argnums:
-          grad_vals.append(arrays[i].node.partial_derivative(result_array.node))
-          arrays[i]._marked_for_bp = False
+            grad_vals.append(arrays[i].node.partial_derivative(result_array.node))
+            arrays[i]._marked_for_bp = False
         if len(grad_vals) == 1:
-          grad_vals = grad_vals[0]
+            grad_vals = grad_vals[0]
         return grad_vals, result_array
     return wrapped
 
@@ -115,3 +117,43 @@ def function(symbol, input_shapes):
     for name in param_names:
         prim.def_grad_kw(def_grad_kw(name), name)
     return prim
+
+class ConvertErrorUnexpectedType(ValueError):
+    pass
+
+def NumpyVarToMinpy(var):
+  return array.Value.wrap(var)
+
+def MinpyVarToNumpy(var):
+  return array.Value.wrap(var).get_data(ArrayType.NUMPY)
+
+def ConvFunc(var, conv, basic_types):
+  if isinstance(var, tuple):
+    np_var = tuple(conv(v)  for v in var)
+  elif isinstance(var, list):
+    np_var = list(conv(v)  for v in var)
+  elif isinstance(var, dict):
+    np_var = {k:conv(v)  for k, v in var.iteritems()}
+  elif type(var) in basic_types:
+    np_var = conv(var)
+  else:
+    raise ConvertErrorUnexpectedType('Unexpected %s type found in core.ConvToNumpy' % v_t)
+  return np_var
+
+def converter(cmd):
+  def wrapper(func):
+    @functools.wraps(func)
+    def real_wrapper(*args, **kwargs):
+      basic_types = array_types.values() + number_types.values()
+      mpy_args = ConvFunc(args, NumpyVarToMinpy, basic_types)
+      mpy_kwargs = ConvFunc(kwargs, NumpyVarToMinpy, basic_types)
+
+      mpy_res = func(*mpy_args, **mpy_kwargs)
+      if cmd == 'lazy':
+        # lazy mode returns funciton result without converting
+        return mpy_res
+      else:
+        return ConvFunc(mpy_res, MinpyVarToNumpy, basic_types)
+
+    return real_wrapper
+  return wrapper

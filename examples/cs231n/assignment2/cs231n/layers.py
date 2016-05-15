@@ -4,8 +4,9 @@ import minpy.core
 import minpy.array
 from minpy.array_variants import ArrayType
 import minpy.dispatch.policy as policy
+import minpy.numpy.random as random
 
-#np.set_policy(policy.OnlyNumpyPolicy())
+np.set_policy(policy.OnlyNumpyPolicy())
 #np.set_policy(policy.PreferMXNetPolicy())
 
 def affine_forward(x, w, b):
@@ -27,9 +28,7 @@ def affine_forward(x, w, b):
   - cache: (x, w, b)
   """
 
-  #TODO(Haoran): remove reshape outside loss function
-  x_plain = np.reshape(x, (x.shape[0], -1))
-  out = np.dot(x_plain, w) + b
+  out = np.dot(x, w) + b
 
   return out
 
@@ -98,39 +97,27 @@ def batchnorm_forward(x, gamma, beta, bn_param):
   momentum = bn_param.get('momentum', 0.9)
 
   N, D = x.shape
-  running_mean = bn_param.get('running_mean', np.zeros(D, dtype=x.dtype))
-  running_var = bn_param.get('running_var', np.zeros(D, dtype=x.dtype))
+  running_mean = bn_param.get('running_mean', np.zeros(D))
+  running_var = bn_param.get('running_var', np.zeros(D))
 
-  out, cache = None, None
+  out = None
   if mode == 'train':
-    #############################################################################
-    # TODO: Implement the training-time forward pass for batch normalization.   #
-    # Use minibatch statistics to compute the mean and variance, use these      #
-    # statistics to normalize the incoming data, and scale and shift the        #
-    # normalized data using gamma and beta.                                     #
-    #                                                                           #
-    # You should store the output in the variable out. Any intermediates that   #
-    # you need for the backward pass should be stored in the cache variable.    #
-    #                                                                           #
-    # You should also use your computed sample mean and variance together with  #
-    # the momentum variable to update the running mean and running variance,    #
-    # storing your result in the running_mean and running_var variables.        #
-    #############################################################################
-    pass
-    #############################################################################
-    #                             END OF YOUR CODE                              #
-    #############################################################################
+    mean = np.sum(x, axis = 0)/N
+    x_mean = (x - mean)
+    sqr_x_mean = x_mean ** 2
+    var = np.sum(sqr_x_mean, axis = 0)/N
+    sqrt_var = np.sqrt(var + eps)
+
+    inv_sqrt_var = 1.0/sqrt_var
+
+    x_hat = x_mean * inv_sqrt_var
+    out = gamma * x_hat + beta
+
+    running_mean = momentum*running_mean + (1.0 - momentum) * mean
+    running_var = momentum*running_var + (1.0 - momentum) * var
   elif mode == 'test':
-    #############################################################################
-    # TODO: Implement the test-time forward pass for batch normalization. Use   #
-    # the running mean and variance to normalize the incoming data, then scale  #
-    # and shift the normalized data using gamma and beta. Store the result in   #
-    # the out variable.                                                         #
-    #############################################################################
-    pass
-    #############################################################################
-    #                             END OF YOUR CODE                              #
-    #############################################################################
+    x_hat = (x - running_mean)/np.sqrt(running_var + eps)
+    out = gamma * x_hat + beta
   else:
     raise ValueError('Invalid forward batchnorm mode "%s"' % mode)
 
@@ -138,9 +125,7 @@ def batchnorm_forward(x, gamma, beta, bn_param):
   bn_param['running_mean'] = running_mean
   bn_param['running_var'] = running_var
 
-  return out, cache
-
-
+  return out
 
 def dropout_forward(x, dropout_param):
   """
@@ -163,33 +148,19 @@ def dropout_forward(x, dropout_param):
   """
   p, mode = dropout_param['p'], dropout_param['mode']
   if 'seed' in dropout_param:
-    np.random.seed(dropout_param['seed'])
+    random.seed(dropout_param['seed'])
 
   mask = None
   out = None
 
   if mode == 'train':
-    ###########################################################################
-    # TODO: Implement the training phase forward pass for inverted dropout.   #
-    # Store the dropout mask in the mask variable.                            #
-    ###########################################################################
-    pass
-    ###########################################################################
-    #                            END OF YOUR CODE                             #
-    ###########################################################################
-  elif mode == 'test':
-    ###########################################################################
-    # TODO: Implement the test phase forward pass for inverted dropout.       #
-    ###########################################################################
-    pass
-    ###########################################################################
-    #                            END OF YOUR CODE                             #
-    ###########################################################################
+    #TODO: check implementation of compare operator in mxnet? 
+    mask = random.rand(*x.shape) > p
+    out = x * mask #drop!
+  else:
+    out = x
 
-  cache = (dropout_param, mask)
-  out = out.astype(x.dtype, copy=False)
-
-  return out, cache
+  return out
 
 def conv_forward_naive(x, w, b, conv_param):
   """
@@ -309,7 +280,9 @@ def svm_loss(x, y):
   correct_class_scores = x[np.arange(N), y]
   
   #TODO: Support broadcast case: (X,) (X, Y)
-  #margins = np.maximum(0, x - correct_class_scores[:, np.newaxis] + 1.0)
+  #shape(x) is (d0, d1)
+  #shape(correct_class_scores) is (d0,)
+  #margins = np.maximum(0, x - correct_class_scores + 1.0)
   margins = np.transpose(np.maximum(0, np.transpose(x) - np.transpose(correct_class_scores) + 1.0))
 
   loss = (np.sum(margins) - np.sum(margins[np.arange(N), y])) / N
@@ -328,20 +301,11 @@ def softmax_loss(x, y):
 
   Returns a tuple of:
   - loss: Scalar giving the loss
-  - dx: Gradient of the loss with respect to x
   """
-  #np.expand_dims(correct_class_scores, axis = 1)
-  #probs = np.exp(x - np.max(x, axis=1, keepdims=True))
-  #print "x.shape", x.shape
-
-  #Somehow Buggy. Max doesn't work.
+  #Missing Max Operator 
   probs = np.exp(x - np.expand_dims(np.max(x, axis=1), axis = 1))
-  probs /= np.expand_dims(np.sum(probs, axis=1), axis = 1)
+  probs = probs / np.expand_dims(np.sum(probs, axis=1), axis = 1)
   N = x.shape[0]
   loss = -np.sum(np.log(probs[np.arange(N), y])) / N
 
-  dx = probs.copy()
-  dx[np.arange(N), y] -= 1
-  dx /= N
-
-  return loss, dx
+  return loss

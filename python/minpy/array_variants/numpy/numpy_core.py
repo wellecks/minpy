@@ -36,6 +36,7 @@ def unbroadcast(ans, x, gradfun):
             for axis, size in enumerate(shape):
                 if size == 1:
                     result = np.sum(result, axis=axis, keepdims=True)
+
             assert np.shape(result) == shape
             return result
     elif isinstance(ans, np.ndarray): # x is numerical value
@@ -97,6 +98,7 @@ def def_grads(reg, prims):
             lambda ans, x, y: unbroadcast(ans, y, lambda g: -g * np.floor(x / y)),
             argnum=1)
     prims('negative').def_grad(lambda ans, x: operator.neg)
+    prims('transpose').def_grad(lambda ans, x: np.transpose)
     prims('abs').def_grad(lambda ans, x: lambda g: np.sign(x) * g)
     prims('sign').def_grad_zero()
     prims('round').def_grad_zero()
@@ -110,3 +112,4 @@ def def_grads(reg, prims):
     prims('maximum').def_grad(lambda ans, x, y: unbroadcast(ans, x, lambda g: g * (x == ans)))
     prims('maximum').def_grad(lambda ans, x, y: unbroadcast(ans, y, lambda g: g * (y == ans)), argnum=1)
     prims('_minpy_indexing_delegate').def_grad(lambda ans, x, index: lambda g: _minpy_indexing_delegate_grad(x, index, g))
+    prims('reshape').def_grad(lambda _0, x, _1: lambda g: np.reshape(g, x.shape))

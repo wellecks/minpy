@@ -4,11 +4,11 @@ This file implements fullyconnected network in minpy.
 All the array created in this file belongs to minpy.array Type.
 Types of input values to loss() function, i.e. training/testing data & targets, should also be minpy.array.
 """
-
 import numpy as py_np
+import functools
 
 from model import ModelBase
-from cs231n.layers import affine_forward
+from cs231n.layers import affine_forward, relu_forward, svm_loss, dropout_forward, batchnorm_forward
 from cs231n.layer_utils import affine_relu_forward
 
 import minpy
@@ -35,7 +35,7 @@ class TwoLayerNet(ModelBase):
   """
   
   def __init__(self, input_dim=3*32*32, hidden_dim=100, num_classes=10,
-               weight_scale=1e-3, reg=0.0):
+               weight_scale=1e-3, reg=0.0, conv_mode='lazy'):
     """
     Initialize a new network.
 
@@ -48,6 +48,7 @@ class TwoLayerNet(ModelBase):
       initialization of the weights.
     - reg: Scalar giving L2 regularization strength.
     """
+    super(TwoLayerNet, self).__init__(conv_mode)
     self.params = {}
     self.reg = reg
 
@@ -76,7 +77,6 @@ class TwoLayerNet(ModelBase):
       names to gradients of the loss with respect to those parameters.
     """  
     # Note: types of X, y are mxnet.ndarray
-
     def train_loss(X, y, W1, W2, b1, b2):
       l1 = affine_relu_forward(X, W1, b1)
       l2 = affine_forward(l1, W2, b2)
@@ -97,12 +97,13 @@ class TwoLayerNet(ModelBase):
     for param_name in params_list_name:
       self.params_array.append(self.params[param_name])
 
+    X_plain = np.reshape(X, (X.shape[0], -1))
     if y is None:
-      return train_loss(X, y, *self.params_array)
+      return train_loss(X_plain, y, *self.params_array)
 
     grad_function = grad_and_loss(train_loss, range(2, 6))
 
-    grads_array, loss = grad_function(X, y, *self.params_array)
+    grads_array, loss = grad_function(X_plain, y, *self.params_array)
 
     grads = {}
     for i in range(len(params_list_name)):
@@ -127,15 +128,10 @@ class FullyConnectedNet(ModelBase):
   self.params dictionary and will be learned using the Solver class.
   """
 
-  def GetWeightName(self, kth):
-    return 'W' + str(kth)
-
-  def GetBiasName(self, kth):
-    return 'B' + str(kth)
-
   def __init__(self, hidden_dims, input_dim=3*32*32, num_classes=10,
                dropout=0, use_batchnorm=False, reg=0.0,
-               weight_scale=1e-2, seed=None):
+               weight_scale=1e-2, seed=None, conv_mode='lazy'):
+
     """
     Initialize a new FullyConnectedNet.
     
@@ -149,33 +145,24 @@ class FullyConnectedNet(ModelBase):
     - reg: Scalar giving L2 regularization strength.
     - weight_scale: Scalar giving the standard deviation for random
       initialization of the weights.
-    - dtype: A numpy datatype object; all computations will be performed using
-      this datatype. float32 is faster but less accurate, so you should use
-      float64 for numeric gradient checking.
     - seed: If not None, then pass this random seed to the dropout layers. This
       will make the dropout layers deteriminstic so we can gradient check the
       model.
     """
+    super(FullyConnectedNet, self).__init__(conv_mode)
     self.use_batchnorm = use_batchnorm
     self.use_dropout = dropout > 0
     self.reg = reg
     self.num_layers = 1 + len(hidden_dims)
-    #self.dtype = dtype
     self.params = {}
 
-    ############################################################################
-    # TODO: Initialize the parameters of the network, storing all values in    #
-    # the self.params dictionary. Store weights and biases for the first layer #
-    # in W1 and b1; for the second layer use W2 and b2, etc. Weights should be #
-    # initialized from a normal distribution with standard deviation equal to  #
-    # weight_scale and biases should be initialized to zero.                   #
-    #                                                                          #
-    # When using batch normalization, store scale and shift parameters for the #
-    # first layer in gamma1 and beta1; for the second layer use gamma2 and     #
-    # beta2, etc. Scale parameters should be initialized to one and shift      #
-    # parameters should be initialized to zero.                                #
-    ############################################################################
-    for l in xrange(self.num_layers):
+    #Define parameter name given # layer
+    self.w_name = lambda l: 'W' + str(l)
+    self.b_name = lambda l: 'b' + str(l)
+    self.bn_ga_name = lambda l: 'bn_ga' + str(l)
+    self.bn_bt_name = lambda l: 'bn_bt' + str(l)
+
+    for l in range(self.num_layers):
       if l == 0:
         input_d = input_dim
       else:
@@ -186,11 +173,13 @@ class FullyConnectedNet(ModelBase):
       else:
         out_d = num_classes
 
-      self.params[self.GetWeightName(l)] = random.randn(input_d, out_d) * weight_scale
-      self.params[self.GetBiasName(l)] = np.zeros((out_d))
-    ############################################################################
-    #                             END OF YOUR CODE                             #
-    ############################################################################
+      self.params[self.w_name(l)] = random.randn(input_d, out_d) * weight_scale
+      self.params[self.b_name(l)] = np.zeros((out_d))
+      if l < self.num_layers and self.use_batchnorm:
+        self.params[self.bn_ga_name(l)] = np.ones((out_d))
+        self.params[self.bn_bt_name(l)] = np.zeros((out_d))
+
+    self.param_keys = self.params.keys()
 
     # When using dropout we need to pass a dropout_param dictionary to each
     # dropout layer so that the layer knows the dropout probability and the mode
@@ -203,17 +192,34 @@ class FullyConnectedNet(ModelBase):
     
     # With batch normalization we need to keep track of running means and
     # variances, so we need to pass a special bn_param object to each batch
-    # normalization layer. You should pass self.bn_params[0] to the forward pass
-    # of the first batch normalization layer, self.bn_params[1] to the forward
-    # pass of the second batch normalization layer, etc.
+    # normalization layer.
     self.bn_params = []
     if self.use_batchnorm:
       self.bn_params = [{'mode': 'train'} for i in xrange(self.num_layers - 1)]
     
-    # Cast all parameters to the correct datatype
-    #for k, v in self.params.iteritems():
-      #self.params[k] = v.astype(dtype)
+    # Build key's index in loss func's arglist
+    self.key_args_index = {}
+    for i, key in enumerate(self.param_keys):
+      # data, targets would be the first two elments in arglist
+      self.key_args_index[key] = self.data_target_cnt + i
 
+    # Init Key to index in loss_function args
+    self.w_idx = self.wrap_param_idx(self.w_name)
+    self.b_idx = self.wrap_param_idx(self.b_name)
+    self.bn_ga_idx = self.wrap_param_idx(self.bn_ga_name)
+    self.bn_bt_idx = self.wrap_param_idx(self.bn_bt_name)
+
+  def wrap_param_idx(self, f):
+    @functools.wraps(f)
+    def find_idx(key):
+      return self.key_args_index[f(key)]
+    return find_idx
+
+  def pack_params(self):
+    params_collect = []
+    for key in self.param_keys:
+      params_collect.append(self.params[key])
+    return params_collect
 
   def loss_and_derivative(self, X, y=None):
     """
@@ -221,6 +227,8 @@ class FullyConnectedNet(ModelBase):
 
     Input / output: Same as TwoLayerNet above.
     """
+
+    X_plain = np.reshape(X, (X.shape[0], -1))
     mode = 'test' if y is None else 'train'
 
     if self.dropout_param is not None:
@@ -228,42 +236,44 @@ class FullyConnectedNet(ModelBase):
 
     if self.use_batchnorm:
       for bn_param in self.bn_params:
-        bn_param[mode] = mode
+        bn_param['mode'] = mode
 
-    # TODO: add bn_options and dropout option
-    assert not (self.use_batchnorm or self.use_dropout)
+    params_array = self.pack_params()
 
-    # args is [X, Y, W[0], ..., W[n-1], b[0], ..., b[n-1]]
-    # type of (args) is list.
     def train_loss(*args):
-      last_layer_output = args[0]
+      X = args[0]
+      y = args[1]
 
+      res = X
       for l in xrange(self.num_layers):
-        if l < (self.num_layers - 1):
-          # TODO: last_layer_output is mutated in this code
-          # TODO: rewrite last_layer_output 
-          last_layer_output, _ = affine_relu_forward(last_layer_output, 
-            args[2 + l], args[2 + self.num_layers + l]) 
-        else:
-          last_layer_output, _ = affine_forward(last_layer_output, 
-            args[2 + l], args[2 + self.num_layers + l]) 
+        prev_res = res
+        res = affine_forward(prev_res, args[self.w_idx(l)], args[self.b_idx(l)])
 
-      scores = last_layer_output 
+        if l < (self.num_layers - 1):
+          if self.use_batchnorm:
+            res = batchnorm_forward(res, args[self.bn_ga_idx(l)],
+                                    args[self.bn_bt_idx(l)], self.bn_params[l])
+          res = relu_forward(res)
+          if self.use_dropout:
+            res = dropout_forward(res, self.dropout_param)
+
+      scores = res
 
       if mode == 'test':
         return scores
 
-      loss, _ = softmax_loss(scores, y)
+      #loss, _ = softmax_loss(scores, y)
+      loss = svm_loss(scores, y)
       return loss
 
-    grad_function = grad_and_loss(train_loss, range(2, 2+2*self.num_layers))
+    if y is None:
+      return train_loss(X_plain, y, *params_array)
 
-    #TODO: define self.WeightAndBiasArray
-    loss, grads_array = grad_function(X, y, *self.WeightAndBiasArray)
+    grad_function = grad_and_loss(train_loss, range(self.data_target_cnt, self.data_target_cnt + len(params_array)))
+    grads_array, loss = grad_function(X_plain, y, *params_array)
+
     grads = {}
 
-    for l in xrange(self.num_layers - 1, -1, -1):
-      grads[self.GetWeightName(l)] = grads_array[l]
-      grads[self.GetBiasName(l)] = grads_array[l + self.num_layers]
-
+    for i, grad in enumerate(grads_array):
+      grads[self.param_keys[i]] = grad
     return loss, grads

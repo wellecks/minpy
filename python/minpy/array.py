@@ -67,6 +67,11 @@ class Node(object):
                         operator.add,
                         map(call, self._partial_derivatives),
                         0.0)
+
+                # in case _partial_derivatives is empty
+                if (type(res) == float) and (type(self._value) != Number):
+                  res = numpy.zeros(self._value.shape)
+
                 self._partial_derivative_cache[target] = Value.wrap(res)
         return self._partial_derivative_cache[target]
 
@@ -426,7 +431,7 @@ class Array(Value):
         if isinstance(index, tuple):
             np_index = tuple(x if type(x) is slice else Value.wrap(x).get_data(ArrayType.NUMPY) for x in index)
         else:
-            np_index = x if type(x) is slice else Value.Wrap(index).get_data(ArrayType.NUMPY)
+            np_index = index if type(index) is slice else Value.wrap(index).get_data(ArrayType.NUMPY)
         return Value._ns._minpy_indexing_delegate(self, np_index)
 
     def __setitem__(self, index, val):
@@ -439,7 +444,7 @@ class Array(Value):
         if isinstance(index, tuple):
             np_index = tuple(x if type(x) is slice else Value.wrap(x).get_data(ArrayType.NUMPY) for x in index)
         else:
-            np_index = x if type(x) is slice else Value.wrap(index).get_data(ArrayType.NUMPY)
+            np_index = index if type(index) is slice else Value.wrap(index).get_data(ArrayType.NUMPY)
         self.get_data_mutable(ArrayType.NUMPY).__setitem__(np_index, Value.wrap(val).get_data(ArrayType.NUMPY))
 
     def __delitem__(self, index):
@@ -584,6 +589,7 @@ class Primitive(object):
         Return:
             self instance for multiple def_grad in one statement
         """
+        # XXX(minjie): why comment enforce_input_type?
         #self._grad_func[argnum] = self._enforce_input_type(func)
         self._grad_func[argnum] = func
         return self
@@ -602,3 +608,9 @@ class Primitive(object):
 
     def def_grad_zero(self, argnum=0):
         self._grad_func[argnum] = lambda *args, **kwargs: lambda g: 0.0
+
+    def gradable(self, args_len, kwargs_keys):
+        ret = args_len <= len(self._grad_func)
+        for i in kwargs_keys:
+            ret = ret and (i in self._grad_func_kw)
+        return ret

@@ -33,6 +33,7 @@ def register_primitives(reg, prim_wrapper):
     # Additional primitives due to naming issues in MXNet.
     reg.register('power', prim_wrapper(NDArray._power))
     reg.register('maximum', prim_wrapper(NDArray._maximum))
+    reg.register('reshape', prim_wrapper(NDArray.reshape))
 
 def gen_sum_grad(ans, x, axis, keepdims):
     xshape = list(x.shape)
@@ -80,6 +81,7 @@ def def_grads(reg, prims):
     #prims.mod.def_grad(lambda ans, x, y : unbroadcast(ans, y, lambda g : - g * ndarray.floor(x/y)), argnum=1)
     # negate
     prims('negative').def_grad(lambda ans, x: operator.neg)
+    prims('transpose').def_grad(lambda ans, x: mxnet.nd.transpose)
     prims('abs').def_grad(lambda ans, x: lambda g: mxnet.nd.sign(x) * g)
     prims('sign').def_grad_zero()
     prims('round').def_grad_zero()
@@ -88,5 +90,6 @@ def def_grads(reg, prims):
     prims('sqrt').def_grad(lambda ans, x: lambda g: g * 0.5 / mxnet.nd.sqrt(x))
     prims('sin').def_grad(lambda ans, x: lambda g: g * mxnet.nd.cos(x))
     prims('cos').def_grad(lambda ans, x: lambda g: -g * mxnet.nd.sin(x))
-    prims('power').def_grad(lambda ans, x, y: unbroadcast(ans, x, lambda g: g * y * mxnet.nd.power(x, y - 1)))
+    prims('power').def_grad(lambda ans, x, y: unbroadcast(ans, x, lambda g: g * y * mxnet.nd.NDArray._power(x, y - 1)))
     prims('power').def_grad(lambda ans, x, y: unbroadcast(ans, y, lambda g: g * mxnet.nd.log(x) * ans), argnum=1)
+    prims('reshape').def_grad(lambda _0, x, _1: lambda g: mxnet.nd.NDArray.reshape(g, x.shape))
