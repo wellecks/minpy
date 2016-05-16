@@ -76,10 +76,11 @@ def rnn_forward(x, h0, Wx, Wh, b):
     if t == 0:
       h_prev = h0
     else:
-      h_prev = h[:,t-1,:].reshape([N,H])
-    x_t = x[:,t,:].reshape([N,D])
+      h_prev = np.reshape(h[:,t-1,:], [N,H])
+    x_t = np.reshape(x[:,t,:],[N,D])
     h_t, cache_t = rnn_step_forward(x_t, h_prev, Wx, Wh, b) 
-    h = np.append(h, h_t.reshape([N,1,H]), axis = 1)
+    h = np.append(h, np.reshape(h_t, [N,1,H]), axis = 1)
+    #h = np.reshape(h_t, [N,1,H])
     cache.append(cache_t)
   return h, cache
 

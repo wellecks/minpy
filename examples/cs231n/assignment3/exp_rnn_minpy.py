@@ -20,7 +20,6 @@ def MinpyVarToNumpy(var):
 
 def rel_error(x, y):
   a = np.max(np.abs(x - y) / (np.maximum(1e-5, np.abs(x) + np.abs(y))))
-  '''
   if a > 0.5:
     print 'probably error'
     print np.abs(x - y) / (np.maximum(1e-5, np.abs(x) + np.abs(y)))
@@ -28,7 +27,6 @@ def rel_error(x, y):
     print x 
     print 'right'
     print y 
-  '''
   return a
 
 # Forward step
@@ -124,7 +122,7 @@ def Test_RNN_Forward():
   print 'h error: ', rel_error(expected_h, h)
 
 def Test_RNN_Backward():
-  N, D, T, H = 2, 3, 10, 5
+  N, D, T, H = 2, 3, 1, 5
 
   x = np.random.randn(N, T, D)
   h = np.random.randn(N, H)
@@ -156,11 +154,12 @@ def Test_RNN_Backward():
   db_num = eval_numerical_gradient_array(lambda b: MinpyVarToNumpy(rnn_forward(x, h, Wx, Wh, NumpyVarToMinpy(b))[0]), b, dout)
   
   print 'dx error: ', rel_error(dx_num, MinpyVarToNumpy(grad_arrays[0]))
+  '''
   print 'dh error: ', rel_error(dh_num, MinpyVarToNumpy(grad_arrays[1]))
   print 'dWx error: ', rel_error(dWx_num, MinpyVarToNumpy(grad_arrays[2]))
   print 'dWh error: ', rel_error(dWh_num, MinpyVarToNumpy(grad_arrays[3]))
   print 'db error: ', rel_error(db_num, MinpyVarToNumpy(grad_arrays[4]))
-
+  '''
 
 #Test_Forward_Step()
 #Test_Backward_Step()
