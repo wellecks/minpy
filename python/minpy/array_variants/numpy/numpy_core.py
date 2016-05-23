@@ -55,7 +55,8 @@ def gen_append_grad_x(ans, x, y, axis):
     x_axis_dim = x_shape[axis]
     dim_before_axis = np.prod(ans_shape[0:axis])
     dim_after_axis = np.prod(ans_shape[axis+1:len(ans_shape)])
-    return np.reshape(g,[dim_before_axis, ans_axis_dim,dim_after_axis])[:,0:ans_axis_dim,:].reshape(x_shape)
+    
+    return np.reshape(g,[dim_before_axis, ans_axis_dim,dim_after_axis])[:,0:x_axis_dim,:].reshape(x_shape)
   return get_grad
 
 def gen_append_grad_y(ans, x, y, axis):
@@ -139,7 +140,7 @@ def def_grads(reg, prims):
     prims('reshape').def_grad(lambda _0, x, _1: lambda g: np.reshape(g, x.shape))
 
     # Append.
-    prims('append').def_grad(lambda ans, a, b, axis: lambda g: gen_append_grad_x(ans, a, b, axis))
-    prims('append').def_grad(lambda ans, a, b, axis: lambda g: gen_append_grad_y(ans, a, b, axis), argnum=1)
+    prims('append').def_grad(lambda ans, a, b, axis: gen_append_grad_x(ans, a, b, axis))
+    prims('append').def_grad(lambda ans, a, b, axis: gen_append_grad_y(ans, a, b, axis), argnum=1)
 
 

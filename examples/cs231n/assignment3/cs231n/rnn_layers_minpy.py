@@ -84,6 +84,85 @@ def rnn_forward(x, h0, Wx, Wh, b):
     cache.append(cache_t)
   return h, cache
 
+def word_embedding_forward(x_sparse, W):
+  """
+  Forward pass for word embeddings. We operate on minibatches of size N where
+  each sequence has length T. We assume a vocabulary of V words, assigning each
+  to a vector of dimension D.
+  
+  Inputs:
+  - x: Integer array of shape (N, T) giving indices of words. Each element idx
+    of x muxt be in the range 0 <= idx < V.
+  - W: Weight matrix of shape (V, D) giving word vectors for all words.
+  
+  Returns a tuple of:
+  - out: Array of shape (N, T, D) giving word vectors for all input words.
+  - cache: Values needed for the backward pass
+  """
+  out, cache = None, None
+  # get shape
+  N,T,V = x_sparse.shape
+  _, D = W.shape
+  out = np.dot(np.reshape(x_sparse, [N*T, V]), W)
+  out = np.reshape(out, [N,T,D])
+  cache = (x_sparse)
+  return out, cache
 
+def sigmoid(x):
+  """
+  A numerically stable version of the logistic sigmoid function.
+  """
+  pos_mask = (x >= 0)
+  neg_mask = (x < 0)
+  z = np.zeros_like(x)
+  z[pos_mask] = np.exp(-x[pos_mask])
+  z[neg_mask] = np.exp(x[neg_mask])
+  top = np.ones_like(x)
+  top[neg_mask] = z[neg_mask]
+  return top / (1 + z)
+
+def temporal_affine_forward(x, w, b):
+  """
+  Forward pass for a temporal affine layer. The input is a set of D-dimensional
+  vectors arranged into a minibatch of N timeseries, each of length T. We use
+  an affine function to transform each of those vectors into a new vector of
+  dimension M.
+
+  Inputs:
+  - x: Input data of shape (N, T, D)
+  - w: Weights of shape (D, M)
+  - b: Biases of shape (M,)
+  
+  Returns a tuple of:
+  - out: Output data of shape (N, T, M)
+  - cache: Values needed for the backward pass
+  """
+  N, T, D = x.shape
+  M = b.shape[0]
+  out = np.reshape(x, [N * T, D]).dot(w)
+  out = np.reshape(x, [N,T,M]) + b
+  cache = x, w, b, out
+  return out, cache
+
+def temporal_softmax_loss(x, y, mask, verbose=False):
+  N, T, V = x.shape
+  
+  x_flat = np.reshape(x, [N * T, V])
+  y_flat = np.reshape(y, N * T)
+  mask_flat = np.reshape(mask, N * T)
+  
+  probs = np.exp(x_flat - np.max(x_flat, axis=1, keepdims=True))
+  probs /= np.sum(probs, axis=1, keepdims=True)
+  loss = -np.sum(mask_flat * np.log(probs[np.arange(N * T), y_flat])) / N
+  dx_flat = probs.copy()
+  dx_flat[np.arange(N * T), y_flat] -= 1
+  dx_flat /= N
+  dx_flat *= mask_flat[:, None]
+  
+  if verbose: print 'dx_flat: ', dx_flat.shape
+  
+  dx = np.reshape(dx_flat, [N, T, V])
+  
+  return loss, dx
 
 
