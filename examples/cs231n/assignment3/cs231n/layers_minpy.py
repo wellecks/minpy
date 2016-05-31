@@ -1,4 +1,5 @@
 import minpy.numpy as np
+import numpy as py_np
 
 def affine_forward(x, w, b):
   """
@@ -17,7 +18,9 @@ def affine_forward(x, w, b):
   - out: output, of shape (N, M)
   - cache: (x, w, b)
   """
-  out = np.reshape(x, [x.shape[0], np.prod(x.shape[1:])]).dot(w) + b
+  # TODO here has to use py_np
+  out = np.dot(np.reshape(x, [x.shape[0], py_np.prod(x.shape[1:])]), w)
+  out = out + b
   cache = (x, w, b)
   return out, cache
 

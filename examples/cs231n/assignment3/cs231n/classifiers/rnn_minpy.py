@@ -1,6 +1,7 @@
 import minpy
 import minpy.numpy as np
 import numpy as py_np
+from minpy.core import grad_and_loss
 import functools
 
 from model import ModelBase
@@ -9,7 +10,8 @@ from cs231n.layers_minpy import *
 
 class CaptioningRNN(ModelBase):
   def __init__(self, word_to_idx, input_dim=512, wordvec_dim=128,
-               hidden_dim=128, cell_type='rnn', dtype=np.float32):
+               hidden_dim=128, cell_type='rnn', conv_mode='lazy', dtype=py_np.float32):
+    super(CaptioningRNN, self).__init__(conv_mode)
     if cell_type not in {'rnn', 'lstm'}:
       raise ValueError('Invalid cell_type "%s"' % cell_type)
     
@@ -26,34 +28,38 @@ class CaptioningRNN(ModelBase):
     
     # Initialize word vectors
     self.params['W_embed'] = np.random.randn(vocab_size, wordvec_dim)
-    self.params['W_embed'] /= 100
+    self.params['W_embed'] = self.params['W_embed'] / 100
     
     # Initialize CNN -> hidden state projection parameters
     self.params['W_proj'] = np.random.randn(input_dim, hidden_dim)
-    self.params['W_proj'] /= np.sqrt(input_dim)
+    self.params['W_proj'] = self.params['W_proj'] / py_np.sqrt(input_dim)
     self.params['b_proj'] = np.zeros(hidden_dim)
 
     # Initialize parameters for the RNN
     dim_mul = {'lstm': 4, 'rnn': 1}[cell_type]
-    self.params['Wx'] = np.random.randn(wordvec_dim, dim_mul * hidden_dim)
-    self.params['Wx'] /= np.sqrt(wordvec_dim)
-    self.params['Wh'] = np.random.randn(hidden_dim, dim_mul * hidden_dim)
-    self.params['Wh'] /= np.sqrt(hidden_dim)
+    self.params['W_x'] = np.random.randn(wordvec_dim, dim_mul * hidden_dim)
+    self.params['W_x'] = self.params['W_x'] / py_np.sqrt(wordvec_dim)
+    self.params['W_h'] = np.random.randn(hidden_dim, dim_mul * hidden_dim)
+    self.params['W_h'] = self.params['W_h'] / py_np.sqrt(hidden_dim)
     self.params['b'] = np.zeros(dim_mul * hidden_dim)
     
     # Initialize output to vocab weights
     self.params['W_vocab'] = np.random.randn(hidden_dim, vocab_size)
-    self.params['W_vocab'] /= np.sqrt(hidden_dim)
+    self.params['W_vocab'] = self.params['W_vocab'] / py_np.sqrt(hidden_dim)
     self.params['b_vocab'] = np.zeros(vocab_size)
-      
+    
+    '''
     # Cast parameters to correct dtype
+    # TODO: how to solve this
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(self.dtype)
+    '''
 
   def loss_and_derivative(self, features, captions_in_dense, captions_out_dense, mask):
     def train_loss(features, captions_in_dense, captions_out_dense, mask, W_proj, W_embed, W_h, W_x, W_vocab, b_proj, b, b_vocab):
       N,D = features.shape
-      _,T = captions.shape
+      _,T, _ = captions_in_dense.shape
+      T = T + 1
 
       loss = 0.0
       h0, cache_imgproj = affine_forward(features, W_proj, b_proj)
@@ -78,7 +84,7 @@ class CaptioningRNN(ModelBase):
 
     grad_function = grad_and_loss(train_loss, range(2, 10))
 
-    grads_array, loss = grad_function(features, captions, *self.params_array)
+    grads_array, loss = grad_function(features, captions_in_dense, captions_out_dense, mask, *self.params_array)
 
     grads = {}
 

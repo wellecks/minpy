@@ -7,6 +7,8 @@ from minpy.array_variants import ArrayType
 import minpy.dispatch.policy as policy
 from minpy.core import grad_and_loss
 
+from cs231n.classifiers.rnn_minpy import *
+
 import numpy as np
 
 from cs231n.gradient_check import eval_numerical_gradient, eval_numerical_gradient_array
@@ -238,23 +240,20 @@ def Text_Caption():
     V = len(word_to_idx)
     T = 13
 
-    model = CaptioningRNN(word_to_idx,
-                  input_dim=D,
-                            wordvec_dim=W,
-                                      hidden_dim=H,
-                                                cell_type='rnn',
-                                                          dtype=np.float64)
-
+    model = CaptioningRNN(word_to_idx, input_dim=D, wordvec_dim=W, hidden_dim=H, cell_type='rnn', conv_mode='numpy',dtype=np.float64)
+  
+    '''
     # Set all model parameters to fixed values
     for k, v in model.params.iteritems():
         model.params[k] = np.linspace(-1.4, 1.3, num=v.size).reshape(*v.shape)
+    '''
 
     features = np.linspace(-1.5, 0.3, num=(N * D)).reshape(N, D)
     captions = (np.arange(N * T) % V).reshape(N, T)
     
     captions_in = captions[:, :-1]
     captions_out = captions[:, 1:]
-    mask = (captions_out != self._null)
+    mask = (captions_out != word_to_idx['<NULL>'])
 
     captions_in_dense = Sparse_To_Dense(captions_in, N,T-1,V)
     captions_out_dense = Sparse_To_Dense(captions_in, N,T-1,V)
@@ -272,5 +271,5 @@ def Text_Caption():
 #Test_RNN_Backward()
 #Test_Embed_Forward()
 #Test_Embed_Backward()
-Test_Caption()
+Text_Caption()
 
