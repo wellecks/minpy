@@ -21,8 +21,8 @@ class ModelBase(object):
     self.data_target_cnt = 2
     self.params = {}
 
-  def loss(self, X, y = None):
-    res = wraps(self.convert_mode)(self.loss_and_derivative)(X, y)
+  def loss(self, features, captions):
+    res = wraps(self.convert_mode)(self.loss_and_derivative)(features, captions)
 
     # make loss or score, i.e. res[0], return as numpy.float
     # while grads, i.e. res[1], could be minpy's array
@@ -34,6 +34,6 @@ class ModelBase(object):
     return res
 
   @abc.abstractmethod
-  def loss_and_derivative(self, X, y):
+  def loss_and_derivative(self, features, captions):
     """ do forward and output the loss and derivative, if y is not none"""
     return

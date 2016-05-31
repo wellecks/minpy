@@ -1,27 +1,13 @@
+import minpy
 import minpy.numpy as np
-import numpy as nnp
+import numpy as py_np
+import functools
 
+from model import ModelBase
 from cs231n.rnn_layers_minpy import *
 from cs231n.layers_minpy import *
 
-def NumpyVarToMinpy(var):
-  return minpy.array.Value.wrap(var)
-
-def MinpyVarToNumpy(var):
-  return minpy.array.Value.wrap(var).get_data(ArrayType.NUMPY)
-
-def Word_Encode(x, W):
-    out, cache = None, None
-    # get shape
-    N,T = x.shape
-    V,D = W.shape
-    x_sparse = nnp.zeros([N, T,V])
-    for i in range(N):
-        for j in range(T):
-            x_sparse[i,j,x[i,j]] = 1
-    return x_sparse
-
-class CaptioningRNN(object):
+class CaptioningRNN(ModelBase):
   def __init__(self, word_to_idx, input_dim=512, wordvec_dim=128,
                hidden_dim=128, cell_type='rnn', dtype=np.float32):
     if cell_type not in {'rnn', 'lstm'}:
@@ -64,63 +50,41 @@ class CaptioningRNN(object):
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(self.dtype)
 
-  def loss(self, features, captions):
-    N,D = features.shape
-    _,T = captions.shape
+  def loss_and_derivative(self, features, captions_in_dense, captions_out_dense, mask):
+    def train_loss(features, captions_in_dense, captions_out_dense, mask, W_proj, W_embed, W_h, W_x, W_vocab, b_proj, b, b_vocab):
+      N,D = features.shape
+      _,T = captions.shape
 
-    captions_in = captions[:, :-1]
-    captions_out = captions[:, 1:]
-    mask = (captions_out != self._null)
+      loss = 0.0
+      h0, cache_imgproj = affine_forward(features, W_proj, b_proj)
+    
+      embed, cache_embed = word_embedding_forward(captions_in_dense, W_embed)
+    
+      if self.cell_type == 'rnn':
+        rnn_out, cache_rnn = rnn_forward(embed, h0, W_x, W_h, b) 
+      else:
+        assert(False)
 
-    # Weight and bias for the affine transform from image features to initial
-    # hidden state
-    W_proj, b_proj = self.params['W_proj'], self.params['b_proj']
-    
-    # Word embedding matrix
-    W_embed = self.params['W_embed']
+      affine_out, cache_affine = temporal_affine_forward(rnn_out, W_vocab, b_vocab) 
+      
+      loss, dsoftmax = temporal_softmax_loss(affine_out, captions_out_dense, mask) 
+      
+      return loss
 
-    # Input-to-hidden, hidden-to-hidden, and biases for the RNN
-    Wx, Wh, b = self.params['Wx'], self.params['Wh'], self.params['b']
+    self.params_array = []
+    params_list_name = ['W_proj', 'W_embed', 'W_h', 'W_x', 'W_vocab', 'b_proj', 'b', 'b_vocab']
+    for param_name in params_list_name:
+      self.params_array.append(self.params[param_name])
 
-    # Weight and bias for the hidden-to-vocab transformation.
-    W_vocab, b_vocab = self.params['W_vocab'], self.params['b_vocab']
-    
-    loss, grads = 0.0, {}
-    
-    # (1) Use an affine transformation to compute the initial hidden state     #
-    #     from the image features. This should produce an array of shape (N, H)#
-    h0, cache_imgproj = affine_forward(features, W_proj, b_proj)
-    
-    # (2) Use a word embedding layer to transform the words in captions_in     #
-    #     from indices to vectors, giving an array of shape (N, T, W).         #
-    caption_in_sparse = NumpyVarToMinpy(Word_Encode(captions_in, MinpyVarToNumpy(W_embed)))
-    embed, cache_embed = word_embedding_forward(captions_in_sparse, W_embed)
-    
-    # (3) Use either a vanilla RNN or LSTM (depending on self.cell_type) to    #
-    #     process the sequence of input word vectors and produce hidden state  #
-    #     vectors for all timesteps, producing an array of shape (N, T, H).    #
-    if self.cell_type == 'rnn':
-      rnn_out, cache_rnn = rnn_forward(embed, h0, Wx, Wh, b) 
-    else:
-      assert(False)
+    grad_function = grad_and_loss(train_loss, range(2, 10))
 
-    # (4) Use a (temporal) affine transformation to compute scores over the    #
-    #     vocabulary at every timestep using the hidden states, giving an      #
-    #     array of shape (N, T, V).                                            #
-    affine_out, cache_affine = temporal_affine_forward(rnn_out, W_vocab, b_vocab) 
-    
-    # (5) Use (temporal) softmax to compute loss using captions_out, ignoring  #
-    #     the points where the output word is <NULL> using the mask above.     #
-    loss, dsoftmax = temporal_softmax_loss(affine_out, captions_out, mask) 
-    
-    grads = None
+    grads_array, loss = grad_function(features, captions, *self.params_array)
+
+    grads = {}
+
+    for i in range(len(params_list_name)):
+      grads[params_list_name[i]] = grads_array[i]
+
     return loss, grads
-
-
-
-
-
-
-
 
 

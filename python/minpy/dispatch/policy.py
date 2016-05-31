@@ -1,26 +1,38 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# pylint: disable= no-self-use
 """Policy for selecting appropriate function to call."""
 from ..utils import log
 from ..array_variants import ArrayType
 
+#pylint: disable= invalid-name
 _logger = log.get_logger(__name__)
+#pylint: enable= invalid-name
 
-
-class AmbiguousPolicyError(ValueError):
+class PrimitivePolicyError(ValueError):
+    """ Error during choosing primitives """
     pass
 
 class Policy(object):
     """Policy interface """
-
     def decide(self, candidates, *args, **kwargs):
-        raise AmbiguousPolicyError('Unimplemented')
-
+        """ Primitive decision policy interface
+        Args:
+            candidates:
+                A list of primitive objects
+            args:
+                The arguments passed to the primitive
+            kwargs:
+                The arguments passed to the primitive
+        Return:
+            Which implementation type will be used
+        """
+        raise PrimitivePolicyError('Unimplemented')
 
 class PreferMXNetPolicy(Policy):
     """Perfer using MXNet functions."""
     def decide(self, candidates, *args, **kwargs):
-        if ArrayType.MXNET in candidates:
+        if ArrayType.MXNET in [x.type for x in candidates]:
             return ArrayType.MXNET
         else:
             return ArrayType.NUMPY
@@ -28,10 +40,10 @@ class PreferMXNetPolicy(Policy):
 class OnlyNumpyPolicy(Policy):
     """Perfer using MXNet functions."""
     def decide(self, candidates, *args, **kwargs):
-        if ArrayType.NUMPY in candidates:
+        if ArrayType.NUMPY in [x.type for x in candidates]:
             return ArrayType.NUMPY
         else:
-            raise ValueError("Cannot find proper functions among: {}".format(candidates))
+            raise ValueError("Cannot find proper functions among: {}.".format(candidates))
 
 def resolve_name(name, reg, plc, *args, **kwargs):
     """Resolve a function name.

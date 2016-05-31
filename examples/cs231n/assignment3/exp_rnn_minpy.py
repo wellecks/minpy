@@ -28,6 +28,13 @@ def Word_Encode(x, W):
             x_sparse[i,j,x[i,j]] = 1
     return x_sparse
 
+def Sparse_To_Dense(x, N, T, V):
+    x_sparse = np.zeros([N, T,V])
+    for i in range(N):
+        for j in range(T):
+            x_sparse[i,j,x[i,j]] = 1
+    return x_sparse
+
 def rel_error(x, y):
   a = np.max(np.abs(x - y) / (np.maximum(1e-5, np.abs(x) + np.abs(y))))
   if a > 0.5:
@@ -244,14 +251,20 @@ def Text_Caption():
 
     features = np.linspace(-1.5, 0.3, num=(N * D)).reshape(N, D)
     captions = (np.arange(N * T) % V).reshape(N, T)
+    
+    captions_in = captions[:, :-1]
+    captions_out = captions[:, 1:]
+    mask = (captions_out != self._null)
 
-    loss, grads = model.loss(features, captions)
+    captions_in_dense = Sparse_To_Dense(captions_in, N,T-1,V)
+    captions_out_dense = Sparse_To_Dense(captions_in, N,T-1,V)
+    
+    loss, grads = model.loss(features, captions_in_dense, captions_out_dense, mask)
     expected_loss = 9.83235591003
 
     print 'loss: ', loss
     print 'expected loss: ', expected_loss
     print 'difference: ', abs(loss - expected_loss)
-
 
 #Test_Forward_Step()
 #Test_Backward_Step()
