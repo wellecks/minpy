@@ -73,7 +73,7 @@ class CaptioningRNN(ModelBase):
 
       affine_out, cache_affine = temporal_affine_forward(rnn_out, W_vocab, b_vocab) 
       
-      loss, dsoftmax = temporal_softmax_loss(affine_out, captions_out_dense, mask) 
+      loss = temporal_softmax_loss(affine_out, captions_out_dense, mask) 
       
       return loss
 

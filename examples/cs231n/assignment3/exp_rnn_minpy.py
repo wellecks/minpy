@@ -13,6 +13,13 @@ import numpy as np
 
 from cs231n.gradient_check import eval_numerical_gradient, eval_numerical_gradient_array
 
+from cs231n.captioning_solver import CaptioningSolver
+from cs231n.classifiers.rnn import CaptioningRNN
+from cs231n.coco_utils import load_coco_data, sample_coco_minibatch, decode_captions
+from cs231n.image_utils import image_from_url
+
+
+
 def NumpyVarToMinpy(var):
   return minpy.array.Value.wrap(var)
 
@@ -256,14 +263,80 @@ def Text_Caption():
     mask = (captions_out != word_to_idx['<NULL>'])
 
     captions_in_dense = Sparse_To_Dense(captions_in, N,T-1,V)
-    captions_out_dense = Sparse_To_Dense(captions_in, N,T-1,V)
+    #captions_out_dense = Sparse_To_Dense(captions_in, N,T-1,V)
     
-    loss, grads = model.loss(features, captions_in_dense, captions_out_dense, mask)
+    loss, grads = model.loss(features, captions_in_dense, captions_out, mask)
     expected_loss = 9.83235591003
 
     print 'loss: ', loss
     print 'expected loss: ', expected_loss
     print 'difference: ', abs(loss - expected_loss)
+
+# BP
+def Test_ALL_BP():
+    batch_size = 2
+    timesteps = 3
+    input_dim = 4
+    wordvec_dim = 5
+    hidden_dim = 6
+    word_to_idx = {'<NULL>': 0, 'cat': 2, 'dog': 3}
+    vocab_size = len(word_to_idx)
+
+    captions = np.random.randint(vocab_size, size=(batch_size, timesteps))
+    features = np.random.randn(batch_size, input_dim)
+
+    captions_in = captions[:, :-1]
+    captions_out = captions[:, 1:]
+    mask = (captions_out != word_to_idx['<NULL>'])
+
+    captions_in_dense = Sparse_To_Dense(captions_in, N,T-1,V)
+ 
+
+    model = CaptioningRNN(word_to_idx,
+                      input_dim=input_dim,
+                                wordvec_dim=wordvec_dim,
+                                          hidden_dim=hidden_dim,
+                                                    cell_type='rnn',
+                                                              dtype=np.float64,
+                                                                      )
+
+    loss, grads = model.loss(features, captions)
+
+    print sorted(grads)
+
+    for param_name in sorted(grads):
+          f = lambda _: model.loss(features, captions)[0]
+          param_grad_num = eval_numerical_gradient(f, model.params[param_name], verbose=False, h=1e-6)
+          e = rel_error(param_grad_num, grads[param_name])
+          print '%s relative error: %e' % (param_name, e)
+
+
+# train
+def Test_RNN_Train():
+    data = load_coco_data(pca_features=True)
+    small_data = load_coco_data(max_train=50)
+    small_rnn_model = CaptioningRNN(
+                      cell_type='rnn',
+                                word_to_idx=data['word_to_idx'],
+                                          input_dim=data['train_features'].shape[1],
+                                                    hidden_dim=512,
+                                                              wordvec_dim=256,
+                                                                      )
+
+    small_rnn_solver = CaptioningSolver(small_rnn_model, small_data,
+                       update_rule='adam',
+                                  num_epochs=50,
+                                             batch_size=25,
+                                                        optim_config={
+                                                                         'learning_rate': 5e-3,
+                                                                                    },
+                                                                   lr_decay=0.95,
+                                                                              verbose=True, print_every=10,
+                                                                                       )
+
+    small_rnn_solver.train()
+    print "Finish Training"
+
 
 #Test_Forward_Step()
 #Test_Backward_Step()
@@ -271,5 +344,6 @@ def Text_Caption():
 #Test_RNN_Backward()
 #Test_Embed_Forward()
 #Test_Embed_Backward()
-Text_Caption()
+#Text_Caption()
+Test_RNN_Train()
 

@@ -1,6 +1,11 @@
 import minpy.numpy as np
+from minpy.core import wraps
+import minpy.dispatch.policy as policy
 import numpy as py_np
 
+np.set_policy(policy.OnlyNumpyPolicy())
+
+@wraps('lazy')
 def affine_forward(x, w, b):
   """
   Computes the forward pass for an affine (fully-connected) layer.
@@ -24,6 +29,7 @@ def affine_forward(x, w, b):
   cache = (x, w, b)
   return out, cache
 
+@wraps('lazy')
 def relu_forward(x):
   out = np.maximum(0, x)
   cache = x

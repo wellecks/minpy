@@ -1,5 +1,17 @@
+import minpy 
 import minpy.numpy as np
+import minpy.core
+import minpy.array
+from minpy.core import wraps
+from minpy.array_variants import ArrayType
+import minpy.dispatch.policy as policy
+import minpy.numpy.random as random
+import numpy as py_np
 
+
+np.set_policy(policy.OnlyNumpyPolicy())
+
+@wraps('lazy')
 def affine_forward(x, w, b):
   """
   Computes the forward pass for an affine (fully-connected) layer.
@@ -25,6 +37,7 @@ def affine_forward(x, w, b):
   cache = (x, w, b)
   return out, cache
 
+@wraps('lazy')
 def rnn_step_forward(x, prev_h, Wx, Wh, b):
   """
   Run the forward pass for a single timestep of a vanilla RNN that uses a tanh
@@ -48,6 +61,7 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
   cache = (x, prev_h, Wx, Wh, b, next_h)
   return next_h, cache
 
+@wraps('lazy')
 def rnn_forward(x, h0, Wx, Wh, b):
   """
   Run a vanilla RNN forward on an entire sequence of data. We assume an input
@@ -84,6 +98,7 @@ def rnn_forward(x, h0, Wx, Wh, b):
     cache.append(cache_t)
   return h, cache
 
+@wraps('lazy')
 def word_embedding_forward(x_sparse, W):
   """
   Forward pass for word embeddings. We operate on minibatches of size N where
@@ -108,6 +123,7 @@ def word_embedding_forward(x_sparse, W):
   cache = (x_sparse)
   return out, cache
 
+@wraps('lazy')
 def sigmoid(x):
   """
   A numerically stable version of the logistic sigmoid function.
@@ -121,6 +137,7 @@ def sigmoid(x):
   top[neg_mask] = z[neg_mask]
   return top / (1 + z)
 
+@wraps('lazy')
 def temporal_affine_forward(x, w, b):
   """
   Forward pass for a temporal affine layer. The input is a set of D-dimensional
@@ -139,22 +156,28 @@ def temporal_affine_forward(x, w, b):
   """
   N, T, D = x.shape
   M = b.shape[0]
-  out = np.reshape(x, [N * T, D]).dot(w)
-  out = np.reshape(x, [N,T,M]) + b
+  out = np.dot(np.reshape(x, [N * T, D]),w)
+  out = np.reshape(out + b, [N,T,M])
   cache = x, w, b, out
   return out, cache
 
+@wraps('lazy')
 def temporal_softmax_loss(x, y, mask, verbose=False):
   N, T, V = x.shape
   
   x_flat = np.reshape(x, [N * T, V])
   y_flat = np.reshape(y, N * T)
   mask_flat = np.reshape(mask, N * T)
-  
-  probs = np.exp(x_flat - np.max(x_flat, axis=1, keepdims=True))
+ 
+  max_res = np.max(x_flat, axis=1)
+  tmp_prob = np.transpose(np.transpose(x_flat) - np.transpose(max_res))
+  probs = np.exp(tmp_prob)
   probs /= np.sum(probs, axis=1, keepdims=True)
   loss = -np.sum(mask_flat * np.log(probs[np.arange(N * T), y_flat])) / N
-  dx_flat = probs.copy()
+  return loss
+  '''
+  x_flat = probs.copy()
+  dx_flat = probs
   dx_flat[np.arange(N * T), y_flat] -= 1
   dx_flat /= N
   dx_flat *= mask_flat[:, None]
@@ -162,7 +185,8 @@ def temporal_softmax_loss(x, y, mask, verbose=False):
   if verbose: print 'dx_flat: ', dx_flat.shape
   
   dx = np.reshape(dx_flat, [N, T, V])
-  
+
   return loss, dx
+  '''
 
 

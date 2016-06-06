@@ -99,6 +99,30 @@ def gen_sum_grad(ans, x, axis, keepdims):
         xshape[a] = 1
     return lambda g: np.zeros(x.shape) + g.reshape(tuple(xshape))
 
+def gen_max_grad(ans, x, axis, keepdims):
+    """ Generate gradient function of max """
+    xshape = list(x.shape)
+    if axis is None:
+        return lambda g: np.full(xshape, g)
+    if isinstance(axis, int):
+        axis = [axis]
+    elif isinstance(axis, tuple):
+        axis = list(axis)
+    for a in axis:
+        xshape[a] = 1
+    # hack
+    def fill_back(g, x, axis):
+      x_shape = x.shape
+      result = np.zeros(x.shape)
+      assert axis[0] == 1
+      args = np.argmax(x, axis=1)
+      if axis[0] == 1:
+        for i in xrange(x_shape[1]):
+          result[i, args[i]] = g[args[i]]
+      else:
+        assert(False)
+      return result
+    return lambda g: fill_back(g, x, axis)
 
 def def_grads(reg, prims):
     """ Define gradient function for primitives """
@@ -118,6 +142,14 @@ def def_grads(reg, prims):
             x,
             axis,
             keepdims))
+    
+    prims('max').def_grad(
+        lambda ans, x, axis=None, keepdims=False: gen_max_grad(
+            ans,
+            x,
+            axis,
+            keepdims))
+
     prims('multiply').def_grad(
         lambda ans, x, y: unbroadcast(ans, x, lambda g: g * y))
     prims('multiply').def_grad(
