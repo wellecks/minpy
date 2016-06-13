@@ -1,4 +1,6 @@
-import numpy as np
+import minpy
+import minpy.numpy as np
+from minpy.core import wraps
 
 """
 This file implements various first-order update rules that are commonly used for
@@ -29,7 +31,7 @@ For efficiency, update rules may perform in-place updates, mutating w and
 setting next_w equal to w.
 """
 
-
+@wraps('lazy')
 def sgd(w, dw, config=None):
   """
   Performs vanilla stochastic gradient descent.

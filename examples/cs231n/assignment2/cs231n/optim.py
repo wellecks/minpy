@@ -31,7 +31,6 @@ For efficiency, update rules may perform in-place updates, mutating w and
 setting next_w equal to w.
 """
 
-
 @wraps('lazy')
 def sgd(w, dw, config=None):
   """

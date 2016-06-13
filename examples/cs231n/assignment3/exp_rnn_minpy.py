@@ -14,7 +14,7 @@ import numpy as np
 from cs231n.gradient_check import eval_numerical_gradient, eval_numerical_gradient_array
 
 from cs231n.captioning_solver import CaptioningSolver
-from cs231n.classifiers.rnn import CaptioningRNN
+from cs231n.classifiers.rnn_minpy import CaptioningRNN
 from cs231n.coco_utils import load_coco_data, sample_coco_minibatch, decode_captions
 from cs231n.image_utils import image_from_url
 
@@ -337,6 +337,26 @@ def Test_RNN_Train():
     small_rnn_solver.train()
     print "Finish Training"
 
+'''
+def Test_temperal_affine():
+  # RNN Backward
+  N, D, T, H = 2, 3, 10, 5
+  M = 20
+  x = np.random.randn(N, T, D)
+  Wx = np.random.randn(D, M)
+  b = np.random.randn(M,)
+  out, _ = temporal_affine_forward(x, Wx, b)
+  dout = np.random.randn(*out.shape)
+  loss = lambda x, Wx, b, dout: temporal_affine_forward(x, Wx, b)[0] * dout 
+  grad_fun = grad_and_loss(loss, range(0,3))
+  grad_arrays, loss = grad_fun(x, Wx, b, dout)
+  print 'result'
+  for each_array in grad_arrays:
+    print each_array.shape
+'''
+
+
+
 
 #Test_Forward_Step()
 #Test_Backward_Step()
@@ -346,4 +366,5 @@ def Test_RNN_Train():
 #Test_Embed_Backward()
 #Text_Caption()
 Test_RNN_Train()
+#Test_temperal_affine()
 

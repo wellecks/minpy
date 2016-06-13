@@ -86,6 +86,7 @@ expected_h = np.asarray([
 print 'h error: ', rel_error(expected_h, h)
 '''
 
+'''
 # RNN Backward
 N, D, T, H = 2, 3, 10, 5
 
@@ -118,6 +119,8 @@ print 'dh0 error: ', rel_error(dh0_num, dh0)
 print 'dWx error: ', rel_error(dWx_num, dWx)
 print 'dWh error: ', rel_error(dWh_num, dWh)
 print 'db error: ', rel_error(db_num, db)
+'''
+
 
 '''
 # embed forward
@@ -267,3 +270,4 @@ for split in ['train', 'val']:
     idx += 1
     plt.savefig(info)
 '''
+

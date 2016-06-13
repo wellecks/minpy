@@ -3,6 +3,12 @@ import numpy as np
 from cs231n import optim
 from cs231n.coco_utils import sample_coco_minibatch
 
+def Sparse_To_Dense(x, N, T, V):
+    x_sparse = np.zeros([N, T,V])
+    for i in range(N):
+        for j in range(T):
+            x_sparse[i,j,x[i,j]] = 1
+    return x_sparse
 
 class CaptioningSolver(object):
   """
@@ -143,9 +149,15 @@ class CaptioningSolver(object):
                   batch_size=self.batch_size,
                   split='train')
     captions, features, urls = minibatch
-
+    
+    N,T = captions.shape
+    captions_in = captions[:, :-1]
+    captions_out = captions[:, 1:]
+    mask = (captions_out != self.model.word_to_idx['<NULL>'])
+    captions_in_dense = Sparse_To_Dense(captions_in, N,T-1,self.model.vocab_size)
+ 
     # Compute loss and gradient
-    loss, grads = self.model.loss(features, captions)
+    loss, grads = self.model.loss_and_derivative(features, captions_in_dense, captions_out, mask)
     self.loss_history.append(loss)
 
     # Perform a parameter update
@@ -155,7 +167,6 @@ class CaptioningSolver(object):
       next_w, next_config = self.update_rule(w, dw, config)
       self.model.params[p] = next_w
       self.optim_configs[p] = next_config
-
   
   # TODO: This does nothing right now; maybe implement BLEU?
   def check_accuracy(self, X, y, num_samples=None, batch_size=100):
@@ -214,7 +225,7 @@ class CaptioningSolver(object):
       # Maybe print training loss
       if self.verbose and t % self.print_every == 0:
         print '(Iteration %d / %d) loss: %f' % (
-               t + 1, num_iterations, self.loss_history[-1])
+               t + 1, num_iterations, self.loss_history[-1].get_data(dtype=float))
 
       # At the end of every epoch, increment the epoch counter and decay the
       # learning rate.

@@ -18,16 +18,16 @@ class CaptioningRNN(ModelBase):
     self.cell_type = cell_type
     self.dtype = dtype
     self.word_to_idx = word_to_idx
+    self.vocab_size = len(word_to_idx)
     self.idx_to_word = {i: w for w, i in word_to_idx.iteritems()}
     self.params = {}
 
     self._null = word_to_idx['<NULL>']
     self._start = word_to_idx.get('<START>', None)
     self._end = word_to_idx.get('<END>', None)
-    vocab_size = len(word_to_idx)
     
     # Initialize word vectors
-    self.params['W_embed'] = np.random.randn(vocab_size, wordvec_dim)
+    self.params['W_embed'] = np.random.randn(self.vocab_size, wordvec_dim)
     self.params['W_embed'] = self.params['W_embed'] / 100
     
     # Initialize CNN -> hidden state projection parameters
@@ -44,9 +44,9 @@ class CaptioningRNN(ModelBase):
     self.params['b'] = np.zeros(dim_mul * hidden_dim)
     
     # Initialize output to vocab weights
-    self.params['W_vocab'] = np.random.randn(hidden_dim, vocab_size)
+    self.params['W_vocab'] = np.random.randn(hidden_dim, self.vocab_size)
     self.params['W_vocab'] = self.params['W_vocab'] / py_np.sqrt(hidden_dim)
-    self.params['b_vocab'] = np.zeros(vocab_size)
+    self.params['b_vocab'] = np.zeros(self.vocab_size)
     
     '''
     # Cast parameters to correct dtype
@@ -54,16 +54,12 @@ class CaptioningRNN(ModelBase):
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(self.dtype)
     '''
-
-  def loss_and_derivative(self, features, captions_in_dense, captions_out_dense, mask):
-    def train_loss(features, captions_in_dense, captions_out_dense, mask, W_proj, W_embed, W_h, W_x, W_vocab, b_proj, b, b_vocab):
-      N,D = features.shape
-      _,T, _ = captions_in_dense.shape
-      T = T + 1
-
+  
+  def loss_and_derivative(self, features, captions_in_dense, captions_out, mask):
+    def train_loss(features, captions_in_dense, captions_out, mask, W_proj, W_embed, W_h, W_x, W_vocab, b_proj, b, b_vocab):
       loss = 0.0
       h0, cache_imgproj = affine_forward(features, W_proj, b_proj)
-    
+      
       embed, cache_embed = word_embedding_forward(captions_in_dense, W_embed)
     
       if self.cell_type == 'rnn':
@@ -73,7 +69,7 @@ class CaptioningRNN(ModelBase):
 
       affine_out, cache_affine = temporal_affine_forward(rnn_out, W_vocab, b_vocab) 
       
-      loss = temporal_softmax_loss(affine_out, captions_out_dense, mask) 
+      loss = temporal_softmax_loss(affine_out, captions_out, mask) 
       
       return loss
 
@@ -82,9 +78,9 @@ class CaptioningRNN(ModelBase):
     for param_name in params_list_name:
       self.params_array.append(self.params[param_name])
 
-    grad_function = grad_and_loss(train_loss, range(2, 10))
+    grad_function = grad_and_loss(train_loss, range(4, 12))
 
-    grads_array, loss = grad_function(features, captions_in_dense, captions_out_dense, mask, *self.params_array)
+    grads_array, loss = grad_function(features, captions_in_dense, captions_out, mask, *self.params_array)
 
     grads = {}
 

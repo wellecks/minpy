@@ -117,19 +117,32 @@ def gen_max_grad(ans, x, axis, keepdims):
       assert axis[0] == 1
       args = np.argmax(x, axis=1)
       if axis[0] == 1:
-        for i in xrange(x_shape[1]):
-          result[i, args[i]] = g[args[i]]
+        for i in xrange(x_shape[0]):
+          result[i, args[i]] = g[i]
       else:
         assert(False)
       return result
     return lambda g: fill_back(g, x, axis)
 
+def gen_dot_grad(ans, a, b):
+  def haha(g):
+    return np.dot(g, b.T)
+  return haha 
+
+def gen_dot_grad_1(ans, a, b):
+  def haha(g):
+    return np.dot(a.T, g)
+  return haha 
+
+
+
 def def_grads(reg, prims):
     """ Define gradient function for primitives """
     identity = lambda x: x
     # Dot.
-    prims('dot').def_grad(lambda ans, a, b: lambda g: np.dot(g, b.T))
-    prims('dot').def_grad(lambda ans, a, b: lambda g: np.dot(a.T, g), argnum=1)
+    #prims('dot').def_grad(lambda ans, a, b: lambda g: np.dot(g, b.T))
+    prims('dot').def_grad(lambda ans, a, b: gen_dot_grad(ans, a, b))
+    prims('dot').def_grad(lambda ans, a, b: gen_dot_grad_1(ans, a, b), argnum=1)
 
     # Nonlinear functions.
     prims('tanh').def_grad(lambda ans, x: lambda g: g / np.cosh(x)**2)

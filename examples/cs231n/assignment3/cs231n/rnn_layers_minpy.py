@@ -164,13 +164,12 @@ def temporal_affine_forward(x, w, b):
 @wraps('lazy')
 def temporal_softmax_loss(x, y, mask, verbose=False):
   N, T, V = x.shape
-  
   x_flat = np.reshape(x, [N * T, V])
   y_flat = np.reshape(y, N * T)
   mask_flat = np.reshape(mask, N * T)
- 
-  max_res = np.max(x_flat, axis=1)
-  tmp_prob = np.transpose(np.transpose(x_flat) - np.transpose(max_res))
+  
+  max_res = np.max(x_flat, axis=1, keepdims=True)
+  tmp_prob = x_flat - max_res
   probs = np.exp(tmp_prob)
   probs /= np.sum(probs, axis=1, keepdims=True)
   loss = -np.sum(mask_flat * np.log(probs[np.arange(N * T), y_flat])) / N
