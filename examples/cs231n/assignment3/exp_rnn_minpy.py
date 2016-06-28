@@ -14,8 +14,9 @@ import numpy as np
 from cs231n.gradient_check import eval_numerical_gradient, eval_numerical_gradient_array
 
 from cs231n.captioning_solver import CaptioningSolver
+from cs231n.captioning_solver_dataiter import CaptioningSolver_dataiter
 from cs231n.classifiers.rnn_minpy import CaptioningRNN
-from cs231n.coco_utils import load_coco_data, sample_coco_minibatch, decode_captions
+from cs231n.coco_utils import load_coco_data, sample_coco_minibatch, decode_captions, BucketSentenceIter
 from cs231n.image_utils import image_from_url
 
 
@@ -313,8 +314,9 @@ def Test_ALL_BP():
 
 # train
 def Test_RNN_Train():
+    small_data = load_coco_data(pca_features=True, max_train=50)
     data = load_coco_data(pca_features=True)
-    small_data = load_coco_data(max_train=50)
+    #small_data = load_coco_data(max_train=50)
     small_rnn_model = CaptioningRNN(
                       cell_type='rnn',
                                 word_to_idx=data['word_to_idx'],
@@ -336,6 +338,22 @@ def Test_RNN_Train():
 
     small_rnn_solver.train()
     print "Finish Training"
+
+# train bucket io
+def Test_RNN_Bucket_Train():
+    data = load_coco_data(pca_features=True)
+ 
+    small_rnn_model = CaptioningRNN(cell_type='rnn', word_to_idx=data['word_to_idx'], input_dim=data['train_features'].shape[1],hidden_dim=512,wordvec_dim=256,)
+
+    bucket_iter = BucketSentenceIter(data, 25) 
+    
+    small_rnn_solver = CaptioningSolver_dataiter(small_rnn_model,bucket_iter,update_rule='adam',num_epochs=50,batch_size=25,optim_config={'learning_rate': 5e-3,},lr_decay=0.95,verbose=True, print_every=10,)
+
+    small_rnn_solver.train()
+    print "Finish Training"
+
+
+
 
 '''
 def Test_temperal_affine():
@@ -365,6 +383,6 @@ def Test_temperal_affine():
 #Test_Embed_Forward()
 #Test_Embed_Backward()
 #Text_Caption()
-Test_RNN_Train()
+#Test_RNN_Train()
 #Test_temperal_affine()
-
+Test_RNN_Bucket_Train()
