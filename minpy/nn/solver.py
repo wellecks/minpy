@@ -121,8 +121,7 @@ class Solver(object):
         self.loss_history = []
         self.train_acc_history = []
         self.val_acc_history = []
-        self.train_dataiter.reset()
-        self.test_dataiter.reset()
+        self._reset_data_iterators()
 
         # Make a deep copy of the optim_config for each parameter
         self.optim_configs = {}
@@ -148,6 +147,10 @@ class Solver(object):
             init_rule = getattr(init, init_rule)
             self.init_rules[p] = init_rule
             self.init_configs[p] = init_config
+
+    def _reset_data_iterators(self):
+        self.train_dataiter.reset()
+        self.test_dataiter.reset()
 
     def _step(self, batch):
         """
@@ -247,8 +250,7 @@ class Solver(object):
             
             
             # TODO: should call reset automatically
-            self.train_dataiter.reset()
-            self.test_dataiter.reset()
+            self._reset_data_iterators()
 
             if self.verbose:
                 print('(Epoch %d / %d) train acc: %f; val_acc: %f' % (
