@@ -1,5 +1,4 @@
 """ Initializer codes """
-import minpy
 import minpy.numpy as np
 import minpy.numpy.random as npr
 import numpy
@@ -27,3 +26,9 @@ def gaussian(shape, config):
     stdvar = config['stdvar']
     mu = config['mu']
     return npr.randn(*shape) * stdvar + mu
+
+
+def custom(shape, config):
+    f = config.setdefault('function', np.zeros)
+    ret = f(shape)
+    return ret
